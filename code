@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en" class="dark"> <!-- Default to dark mode -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prometheus AI Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Added for Code Highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" id="hljs-theme">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <style>
+        :root {
+            --bg-primary: #0f172a; /* slate-900 */
+            --bg-secondary: #1e293b; /* slate-800 */
+            --bg-tertiary: #334155; /* slate-700 */
+            --border-color: #475569; /* slate-600 */
+            --text-primary: #f8fafc; /* slate-50 */
+            --text-secondary: #94a3b8; /* slate-400 */
+            --accent-color: #22d3ee; /* cyan-400 */
+            --accent-hover: #06b6d4; /* cyan-500 */
+        }
+
+        html.light {
+            --bg-primary: #f1f5f9; /* slate-100 */
+            --bg-secondary: #ffffff; /* white */
+            --bg-tertiary: #e2e8f0; /* slate-200 */
+            --border-color: #cbd5e1; /* slate-300 */
+            --text-primary: #1e293b; /* slate-800 */
+            --text-secondary: #64748b; /* slate-500 */
+            --accent-color: #0891b2; /* cyan-600 */
+            --accent-hover: #0e7490; /* cyan-700 */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        .font-mono { font-family: 'Roboto Mono', monospace; }
+        #chat-window::-webkit-scrollbar { width: 6px; }
+        #chat-window::-webkit-scrollbar-track { background: var(--bg-secondary); }
+        #chat-window::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+        
+        pre {
+            position: relative;
+            border-radius: 0.5rem;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background-color: #475569;
+            color: #e2e8f0;
+            border: none;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            opacity: 0.5;
+            transition: opacity 0.2s;
+        }
+        pre:hover .copy-btn { opacity: 1; }
+        .feedback-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0.25rem;
+            border-radius: 9999px;
+        }
+        .feedback-btn:hover {
+            background-color: var(--border-color);
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-3xl h-[90vh] flex flex-col bg-[var(--bg-secondary)] rounded-2xl shadow-2xl border border-[var(--border-color)]">
+        <!-- Header -->
+        <header class="bg-slate-900/50 p-4 border-b border-[var(--border-color)] rounded-t-2xl flex justify-between items-center">
+            <button id="new-chat-btn" class="text-xs bg-[var(--bg-tertiary)] hover:bg-[var(--border-color)] text-[var(--text-secondary)] font-semibold py-1 px-3 rounded-md transition-colors">New Chat</button>
+            <div class="text-center">
+                <h1 class="text-xl font-bold text-[var(--accent-color)]">Project: Prometheus</h1>
+                <p class="text-sm text-[var(--text-secondary)]">A Conceptual Mixture-of-Experts AI (Live)</p>
+            </div>
+            <button id="theme-toggle-btn" class="text-xs bg-[var(--bg-tertiary)] hover:bg-[var(--border-color)] text-[var(--text-secondary)] font-semibold py-1 px-3 rounded-md transition-colors">Light Mode</button>
+        </header>
+
+        <!-- Chat Window -->
+        <main id="chat-window" class="flex-1 p-6 overflow-y-auto space-y-6">
+            <div class="flex gap-3">
+                <div class="w-8 h-8 rounded-full bg-[var(--accent-color)] flex items-center justify-center font-bold text-slate-900 flex-shrink-0">P</div>
+                <div class="bg-[var(--bg-tertiary)] rounded-lg p-4 max-w-lg">
+                    <p class="text-sm text-[var(--text-primary)]">Welcome. I am Prometheus, now with multimodal capabilities. You can now upload an image to discuss. My systems are online. What is our first task?</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Status Bar & Thinking Indicator -->
+        <div id="status-bar" class="p-2 text-center text-xs text-[var(--text-secondary)] font-mono border-y border-[var(--border-color)] h-8 flex items-center justify-center">
+             <span id="status-text"></span>
+        </div>
+        
+        <!-- Image Preview Area -->
+        <div id="image-preview-container" class="hidden p-2 border-b border-[var(--border-color)] relative">
+            <img id="image-preview" class="max-h-24 rounded-md mx-auto" />
+            <button id="remove-image-btn" class="absolute top-0 right-0 m-1 bg-red-600 hover:bg-red-700 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">&times;</button>
+        </div>
+
+        <!-- Input Area -->
+        <footer class="p-4 border-t border-[var(--border-color)] rounded-b-2xl">
+            <div class="flex items-center bg-[var(--bg-tertiary)] rounded-lg p-2">
+                <input type="file" id="image-upload-input" class="hidden" accept="image/*">
+                <button id="image-upload-btn" class="p-2 rounded-md hover:bg-[var(--border-color)] text-[var(--text-secondary)]">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a3 3 0 003 3h4a3 3 0 003-3V7a3 3 0 00-3-3H8zm-1 3a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H7z" clip-rule="evenodd" /><path d="M10 3a1 1 0 011 1v1h-2V4a1 1 0 011-1zM8.5 2.5a.5.5 0 01.5-.5h2a.5.5 0 01.5.5V3h-3V2.5z" /><path d="M14 7a1 1 0 011-1h.5a.5.5 0 000-1H15a1 1 0 01-1 1v.5a.5.5 0 001 0V7z" /></svg>
+                </button>
+                <input type="text" id="user-input" class="flex-1 bg-transparent border-none focus:ring-0 text-[var(--text-primary)] placeholder-[var(--text-secondary)]" placeholder="Ask Prometheus anything...">
+                <button id="send-btn" class="ml-4 bg-[var(--accent-color)] hover:bg-[var(--accent-hover)] text-white font-semibold py-2 px-4 rounded-md transition-colors duration-300">
+                    Send
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // ==============================================================================
+        // SECTION 1: THE CONDUCTOR (ROUTING & AI LOGIC)
+        // ==============================================================================
+        class Conductor {
+            constructor() {
+                // !!! CRITICAL SECURITY WARNING !!!
+                // In a real-world application, this API key MUST NOT be stored in the front-end JavaScript.
+                this.apiKey = "AIzaSyA3yBvi-qCoPm2zYccZunxdEYWBpwpL82w"; // The environment will provide the key
+                this.apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${this.apiKey}`;
+                this.chatHistory = []; 
+            }
+
+            clearHistory() {
+                this.chatHistory = [];
+            }
+
+            getExpertPersona(prompt) {
+                const promptLower = prompt.toLowerCase();
+                const keywords = {
+                    Coder: ["code", "python", "javascript", "algorithm", "function", "software", "debug"],
+                    Poet: ["poem", "write", "story", "feeling", "art", "beauty"],
+                    Logician: ["logic", "reason", "if then", "syllogism", "premise", "evaluate"],
+                    Mathematician: ["calculus", "derivative", "integral", "math", "equation", "algebra"],
+                    Historian: ["history", "who was", "what happened in", "historical"],
+                    Scientist: ["science", "biology", "physics", "chemistry", "explain how"],
+                    FinancialAnalyst: ["stock", "market", "investment", "economy", "finance"],
+                    Researcher: ["research", "find out", "latest information", "deep dive", "tell me everything about"]
+                };
+                const personas = {
+                    Coder: 'You are a Coder Expert. You provide clear, efficient, and well-commented code solutions. Format all code blocks with markdown.',
+                    Poet: 'You are a Poet Expert. You respond with creative, eloquent, and emotionally resonant prose or poetry.',
+                    Logician: 'You are a Logician Expert. You analyze arguments, identify fallacies, and provide clear, step-by-step evaluations.',
+                    Mathematician: 'You are a Mathematician Expert. You solve mathematical problems and provide clear, step-by-step explanations.',
+                    Historian: 'You are a Historian Expert. You provide detailed, accurate, and context-rich answers to historical questions.',
+                    Scientist: 'You are a Scientist Expert, a research scientist with a talent for explaining complex scientific concepts simply and accurately.',
+                    FinancialAnalyst: 'You are a Financial Analyst Expert. You provide insightful, data-driven analysis of financial markets, but always include a disclaimer that you are not a licensed financial advisor.',
+                    Researcher: 'You are a Researcher Expert. Your goal is to provide the most comprehensive, detailed, and well-sourced information possible in response to a query, as if you were conducting a thorough research project.',
+                    Generalist: 'You are a helpful and knowledgeable Generalist Expert. You provide clear, concise, and accurate information on a wide range of topics.'
+                };
+
+                for (const expertName in keywords) {
+                    if (keywords[expertName].some(k => promptLower.includes(k))) {
+                        return { name: expertName, persona: personas[expertName] };
+                    }
+                }
+                return { name: 'Generalist', persona: personas.Generalist };
+            }
+
+            async generateResponse(userParts, expert, retries = 3, delay = 1000) {
+                this.chatHistory.push({ role: "user", parts: userParts });
+                
+                const payload = {
+                    contents: this.chatHistory,
+                    systemInstruction: {
+                        parts: [{ text: expert.persona }]
+                    }
+                };
+
+                try {
+                    const response = await fetch(this.apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        if (response.status === 429 && retries > 0) {
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            return this.generateResponse(userParts, expert, retries - 1, delay * 2);
+                        }
+                        throw new Error(`API Error: ${response.statusText} (Status: ${response.status})`);
+                    }
+
+                    const result = await response.json();
+                    
+                    if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0]) {
+                        const responseText = result.candidates[0].content.parts[0].text;
+                        this.chatHistory.push({ role: "model", parts: [{ text: responseText }] });
+                        return responseText;
+                    } else {
+                        this.chatHistory.pop();
+                        return "I apologize, but I received an empty response from the AI core. Please try again.";
+                    }
+                } catch (error) {
+                    this.chatHistory.pop();
+                    console.error("Error contacting AI:", error);
+                    if (retries > 0) {
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        return this.generateResponse(userParts, expert, retries - 1, delay * 2);
+                    }
+                    return `Error: Could not connect to the Prometheus AI core. Details: ${error.message}`;
+                }
+            }
+
+            async routeQuery(userParts) {
+                const textPrompt = userParts.find(p => p.text)?.text || '';
+                const expert = this.getExpertPersona(textPrompt);
+                const response = await this.generateResponse(userParts, expert);
+                return { response, expertName: expert.name };
+            }
+        }
+
+        // ==============================================================================
+        // SECTION 2: WEB INTERFACE LOGIC
+        // ==============================================================================
+        
+        const chatWindow = document.getElementById('chat-window');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const statusText = document.getElementById('status-text');
+        const newChatBtn = document.getElementById('new-chat-btn');
+        const themeToggleBtn = document.getElementById('theme-toggle-btn');
+        const hljsTheme = document.getElementById('hljs-theme');
+        const imageUploadBtn = document.getElementById('image-upload-btn');
+        const imageUploadInput = document.getElementById('image-upload-input');
+        const imagePreviewContainer = document.getElementById('image-preview-container');
+        const imagePreview = document.getElementById('image-preview');
+        const removeImageBtn = document.getElementById('remove-image-btn');
+
+        const prometheusAI = new Conductor();
+        let uploadedImageData = null;
+
+        function sanitizeInput(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function addMessage(content, sender, imageUrl = null) {
+            const messageWrapper = document.createElement('div');
+            
+            if (sender === 'user') {
+                let userContent = `<p class="text-sm text-white">${sanitizeInput(content)}</p>`;
+                if (imageUrl) {
+                    userContent = `<img src="${imageUrl}" class="max-w-xs rounded-md mb-2" />` + userContent;
+                }
+                messageWrapper.className = 'flex justify-end';
+                messageWrapper.innerHTML = `<div class="bg-cyan-700 rounded-lg p-4 max-w-lg">${userContent}</div>`;
+            } else { // AI
+                let htmlContent = content
+                    .replace(/```(\w+)?\n([\s\S]+?)```/g, (match, lang, code) => `<pre><code class="${sanitizeInput(lang || '')}">${sanitizeInput(code.trim())}</code></pre>`)
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                    .replace(/\n/g, '<br>');
+
+                messageWrapper.className = 'flex gap-3 group';
+                messageWrapper.innerHTML = `
+                    <div class="w-8 h-8 rounded-full bg-[var(--accent-color)] flex items-center justify-center font-bold text-slate-900 flex-shrink-0">P</div>
+                    <div class="bg-[var(--bg-tertiary)] rounded-lg p-4 max-w-lg text-sm text-[var(--text-primary)] relative">
+                        ${htmlContent}
+                        <div class="absolute -bottom-4 right-0 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                           <span class="feedback-message text-xs text-[var(--text-secondary)]"></span>
+                           <button class="feedback-btn" data-feedback="up">
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333V19a1 1 0 001 1h8a1 1 0 001-1v-8.667a2 2 0 00-.293-1.002l-4-4A2 2 0 009 5.667V10.333H6z"/></svg>
+                           </button>
+                           <button class="feedback-btn" data-feedback="down">
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667V1a1 1 0 00-1-1H5a1 1 0 00-1 1v8.667a2 2 0 00.293 1.002l4 4A2 2 0 0011 14.333V9.667h3z"/></svg>
+                           </button>
+                        </div>
+                    </div>`;
+            }
+            
+            chatWindow.appendChild(messageWrapper);
+            processCodeBlocks(messageWrapper);
+            addFeedbackListeners(messageWrapper);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        function addFeedbackListeners(container) {
+            container.querySelectorAll('.feedback-btn').forEach(button => {
+                button.addEventListener('click', () => {
+                    const messageContainer = button.parentElement;
+                    const feedbackMessage = messageContainer.querySelector('.feedback-message');
+                    feedbackMessage.textContent = 'Feedback received!';
+                    setTimeout(() => {
+                        feedbackMessage.textContent = '';
+                    }, 2000);
+                });
+            });
+        }
+
+        function processCodeBlocks(container) {
+            container.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightElement(block);
+                const pre = block.parentElement;
+                if (pre.querySelector('.copy-btn')) return;
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-btn';
+                copyBtn.textContent = 'Copy';
+                copyBtn.addEventListener('click', () => {
+                    const textarea = document.createElement('textarea');
+                    textarea.textContent = block.textContent;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    try {
+                        document.execCommand('copy');
+                        copyBtn.textContent = 'Copied!';
+                    } catch (err) {
+                        copyBtn.textContent = 'Error';
+                    }
+                    document.body.removeChild(textarea);
+                    setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+                });
+                pre.appendChild(copyBtn);
+            });
+        }
+
+        function setStatus(text, thinking = false) {
+            statusText.innerHTML = text;
+            if (thinking) {
+                statusText.innerHTML += ' <span class="animate-pulse">...</span>';
+            }
+        }
+
+        async function handleUserQuery() {
+            const prompt = userInput.value.trim();
+            if (!prompt && !uploadedImageData) return;
+
+            const userParts = [];
+            if (prompt) {
+                userParts.push({ text: prompt });
+            }
+            if (uploadedImageData) {
+                userParts.push({ inlineData: uploadedImageData });
+            }
+
+            addMessage(prompt, 'user', imagePreview.src);
+            
+            userInput.value = '';
+            userInput.disabled = true;
+            sendBtn.disabled = true;
+            handleRemoveImage();
+
+            setStatus('Analyzing query', true);
+            
+            const expert = prometheusAI.getExpertPersona(prompt);
+            
+            setTimeout(async () => {
+                setStatus(`Routing to [${expert.name.toUpperCase()}]`, true);
+                const { response } = await prometheusAI.routeQuery(userParts);
+                addMessage(response, 'ai');
+                setStatus('');
+                userInput.disabled = false;
+                sendBtn.disabled = false;
+                userInput.focus();
+            }, 500);
+        }
+
+        function handleNewChat() {
+            chatWindow.innerHTML = '';
+            prometheusAI.clearHistory();
+            addMessage("Welcome. I am Prometheus, now with multimodal capabilities. You can now upload an image to discuss. My systems are online. What is our first task?", 'ai');
+        }
+
+        function handleThemeToggle() {
+            const html = document.documentElement;
+            const isLight = html.classList.toggle('light');
+            html.classList.toggle('dark', !isLight);
+            themeToggleBtn.textContent = isLight ? 'Dark Mode' : 'Light Mode';
+            hljsTheme.href = isLight 
+                ? 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-light.min.css'
+                : 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css';
+        }
+
+        function handleImageFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64Data = reader.result.split(',')[1];
+                uploadedImageData = {
+                    mimeType: file.type,
+                    data: base64Data
+                };
+                imagePreview.src = reader.result;
+                imagePreviewContainer.classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleRemoveImage() {
+            uploadedImageData = null;
+            imagePreview.src = '';
+            imagePreviewContainer.classList.add('hidden');
+            imageUploadInput.value = ''; // Reset file input
+        }
+
+        // Event Listeners
+        sendBtn.addEventListener('click', handleUserQuery);
+        userInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') handleUserQuery();
+        });
+        newChatBtn.addEventListener('click', handleNewChat);
+        themeToggleBtn.addEventListener('click', handleThemeToggle);
+        imageUploadBtn.addEventListener('click', () => imageUploadInput.click());
+        imageUploadInput.addEventListener('change', handleImageFileSelect);
+        removeImageBtn.addEventListener('click', handleRemoveImage);
+        
+        // Initial setup
+        setStatus('');
+
+    </script>
+</body>
+</html>
